@@ -1,8 +1,4 @@
-# Neovim-config
-
-My Neovim setup
-
-## Configuration files
+# Configuration files
 
 In the file [without-lsp.lua](without-lsp.lua) you will find the configuration for Neovim without setting up an LSP server.
 

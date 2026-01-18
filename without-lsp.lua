@@ -272,6 +272,14 @@ require("lazy").setup({
         })
       end,
     },
+
+    -- Rainbow Parentheses
+    {
+      "HiPhish/rainbow-delimiters.nvim",
+      event = "BufRead",
+      config = function()
+      end,
+    },
   },
   
   -- automatically check for plugin updates

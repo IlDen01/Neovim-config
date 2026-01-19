@@ -1,4 +1,6 @@
+-- ==========================================
 -- BASIC SETTINGS
+-- ==========================================
 
 -- Tabs
 vim.opt.expandtab = true
@@ -39,7 +41,51 @@ vim.opt.spelllang = { 'en', 'ru' }
 vim.g.mapleader = " "
 vim.g.maplocalleader = "\\"
 
+-- ==========================================
+-- HELPER FUNCTIONS
+-- ==========================================
+
+-- Smart buffer closing function
+_G.smart_close = function(bufnr)
+  -- If the buffer number is not passed (hotkey), we take the current one
+  bufnr = bufnr or vim.api.nvim_get_current_buf()
+  
+  -- Count how many buffers are open.
+  local bufs = vim.fn.getbufinfo({buflisted = 1})
+  
+  -- If there is more than one buffer, we simply close the current one.
+  if #bufs > 1 then
+    if bufnr == vim.api.nvim_get_current_buf() then
+        vim.cmd("bprevious")
+    end
+    vim.cmd("bdelete! " .. bufnr)
+  else
+    -- This is the LAST buffer
+    
+    -- Checking if Neo-tree is open
+    local has_neotree = false
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+      local buf = vim.api.nvim_win_get_buf(win)
+      if vim.bo[buf].filetype == "neo-tree" then
+        has_neotree = true
+        break
+      end
+    end
+    
+    if has_neotree then
+      -- If there is a tree: delete the buffer and close the editor window.
+      vim.cmd("bdelete! " .. bufnr) 
+      vim.cmd("q") 
+    else
+      -- If there is no tree: exit Neovim
+      vim.cmd("qa")
+    end
+  end
+end
+
+-- ==========================================
 -- PLUGINS
+-- ==========================================
 
 -- Bootstrap lazy.nvim
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
@@ -134,7 +180,7 @@ require("lazy").setup({
       },
       config = function()
         require("neo-tree").setup({
-          close_if_last_window = true, -- Close Neovim if the tree is the last window left
+          close_if_last_window = false, -- Don't close Neovim if the tree is the last window remaining.
           filesystem = {
             filtered_items = {
               visible = true, -- Show hidden files (.gitignore, etc.) in gray
@@ -158,7 +204,8 @@ require("lazy").setup({
         require("bufferline").setup({
           options = {
             -- Close buffer on right click
-            right_mouse_command = "bdelete! %d", 
+            right_mouse_command = "lua smart_close(%d)",
+            close_command = "lua smart_close(%d)",
             -- Show the closing cross only if the buffer is changed
             show_close_icon = false,
             show_buffer_close_icons = true,
@@ -272,12 +319,138 @@ require("lazy").setup({
         })
       end,
     },
-
+    
     -- Rainbow Parentheses
     {
       "HiPhish/rainbow-delimiters.nvim",
       event = "BufRead",
       config = function()
+      end,
+    },
+
+    -- ==========================================
+    -- LSP & AUTOCOMPLETION
+    -- ==========================================
+    
+    -- 1. Mason + LSP Config
+    {
+      "neovim/nvim-lspconfig",
+      dependencies = {
+        "williamboman/mason.nvim",
+        "williamboman/mason-lspconfig.nvim",
+      },
+      config = function()
+        -- Mason Basic Initialization
+        require("mason").setup()
+        local mason_lspconfig = require("mason-lspconfig")
+        local lspconfig = require("lspconfig")
+        
+        -- Autocompletion capabilities (cmp)
+        local capabilities = require("cmp_nvim_lsp").default_capabilities()
+
+        -- Hotkey function (triggered when the server connects)
+        local on_attach = function(client, bufnr)
+          local opts = { buffer = bufnr, silent = true }
+          
+          vim.keymap.set("n", "gD", vim.lsp.buf.declaration, opts)
+          vim.keymap.set("n", "gd", vim.lsp.buf.definition, opts)
+          vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
+          vim.keymap.set("n", "gi", vim.lsp.buf.implementation, opts)
+          vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, opts)
+          vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, opts)
+          vim.keymap.set("n", "gr", vim.lsp.buf.references, opts)
+        end
+
+        -- Setting up Mason-LSPConfig
+        mason_lspconfig.setup({
+          -- The list is empty! We don't pre-set anything.
+          ensure_installed = {}, 
+          
+          -- Enable auto-installation when opening a file
+          automatic_installation = true, 
+          
+          -- Хендлеры: как настраивать серверы
+          handlers = {
+            -- Standard handler (for 99% of languages: Python, C++, Go...)
+            function(server_name)
+              lspconfig[server_name].setup({
+                on_attach = on_attach,
+                capabilities = capabilities,
+              })
+            end,
+
+            -- Special handler for Lua (requires special settings)
+            ["lua_ls"] = function()
+               lspconfig.lua_ls.setup({
+                 on_attach = on_attach,
+                 capabilities = capabilities,
+                 settings = {
+                    Lua = {
+                        diagnostics = { globals = { "vim" } },
+                        workspace = { library = vim.api.nvim_get_runtime_file("", true) },
+                    }
+                 }
+               })
+            end,
+          }
+        })
+      end,
+    },
+
+    -- 2. Autocompletion(Cmp)
+    {
+      "hrsh7th/nvim-cmp",
+      dependencies = {
+          "hrsh7th/cmp-nvim-lsp", -- Source: LSP
+          "hrsh7th/cmp-buffer", -- Source: words from a file
+          "hrsh7th/cmp-path", -- Source: file paths
+          "L3MON4D3/LuaSnip", -- Snippet engine
+          "saadparwaiz1/cmp_luasnip", -- Snippet and cmp bundle
+      },
+      config = function()
+        local cmp = require("cmp")
+        local luasnip = require("luasnip")
+
+        cmp.setup({
+          snippet = {
+            expand = function(args)
+              luasnip.lsp_expand(args.body)
+            end,
+          },
+          mapping = cmp.mapping.preset.insert({
+            ["<C-k>"] = cmp.mapping.select_prev_item(), -- Up the list
+            ["<C-j>"] = cmp.mapping.select_next_item(), -- Down the list
+            ["<C-b>"] = cmp.mapping.scroll_docs(-4),
+            ["<C-f>"] = cmp.mapping.scroll_docs(4),
+            ["<C-Space>"] = cmp.mapping.complete(), -- Call the menu
+            ["<CR>"] = cmp.mapping.confirm({ select = false }), -- Press Enter to select, but only when an option is selected.
+            ["<Tab>"] = cmp.mapping(function(fallback)  -- Tab works smart
+              if cmp.visible() then
+                cmp.select_next_item()
+              elseif luasnip.expand_or_jumpable() then
+                luasnip.expand_or_jump()
+              else
+                fallback()
+              end
+            end, { "i", "s" }),
+            ["<S-Tab>"] = cmp.mapping(function(fallback) -- Shift+Tab back
+              if cmp.visible() then
+                cmp.select_prev_item()
+              elseif luasnip.jumpable(-1) then
+                luasnip.jump(-1)
+              else
+                fallback()
+              end
+            end, { "i", "s" }),
+          }),
+          sources = cmp.config.sources({
+            { name = "nvim_lsp" }, -- Hints from the language
+            { name = "luasnip" }, -- Snippets
+          }, {
+            { name = "buffer" }, -- Words from the text
+            { name = "path" }, -- File paths
+          }),
+        })
       end,
     },
   },
@@ -297,5 +470,11 @@ vim.keymap.set('v', '//', 'y/<C-R>"<CR>', { silent = true, desc = "Search select
 -- Bufferline
 vim.keymap.set('n', '<Tab>', ':BufferLineCycleNext<CR>', { silent = true, desc = "Next buffer" })
 vim.keymap.set('n', '<S-Tab>', ':BufferLineCyclePrev<CR>', { silent = true, desc = "Prev buffer" })
-vim.keymap.set('n', '<leader>x', ':bp|bd #<CR>', { silent = true, desc = "Close buffer" })
+vim.keymap.set('n', '<leader>x', ':lua smart_close()<CR>', { silent = true, desc = "Close buffer" })
+
+-- Open Mason
+vim.keymap.set('n', '<leader>m', ':Mason<CR>', { silent = true, desc = "Open Mason" })
+
+-- Open Lazy
+vim.keymap.set('n', '<leader>l', ':Lazy<CR>', { silent = true, desc = "Open Lazy" })
 

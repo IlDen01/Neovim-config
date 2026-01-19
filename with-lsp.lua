@@ -425,3 +425,6 @@ vim.keymap.set('n', '<Tab>', ':BufferLineCycleNext<CR>', { silent = true, desc =
 vim.keymap.set('n', '<S-Tab>', ':BufferLineCyclePrev<CR>', { silent = true, desc = "Prev buffer" })
 vim.keymap.set('n', '<leader>x', ':bp|bd #<CR>', { silent = true, desc = "Close buffer" })
 
+-- Open Mason
+vim.keymap.set('n', '<leader>m', ':Mason<CR>', { silent = true, desc = "Open Mason" })
+

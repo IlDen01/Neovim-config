@@ -285,70 +285,72 @@ require("lazy").setup({
     -- LSP & AUTOCOMPLETION
     -- ==========================================
     
-    -- 1. Mason (Language Server Installer)
+    -- 1. Mason + LSP Config
     {
-      "williamboman/mason.nvim",
+      "neovim/nvim-lspconfig",
       dependencies = {
+        "williamboman/mason.nvim",
         "williamboman/mason-lspconfig.nvim",
-        "neovim/nvim-lspconfig",
       },
       config = function()
+        -- Mason Basic Initialization
         require("mason").setup()
-        require("mason-lspconfig").setup({
-          -- Automatically install servers for these languages
-          ensure_installed = { 
-            "lua_ls",  -- Lua (for configuring Neovim)
-            "clangd",  -- C++
-            "gopls",   -- Go
-            "pyright", -- Python
-            "jdtls",   -- Java (Java 17+ required on your system!)
-          }, 
+        local mason_lspconfig = require("mason-lspconfig")
+        local lspconfig = require("lspconfig")
+        
+        -- Autocompletion capabilities (cmp)
+        local capabilities = require("cmp_nvim_lsp").default_capabilities()
+
+        -- Hotkey function (triggered when the server connects)
+        local on_attach = function(client, bufnr)
+          local opts = { buffer = bufnr, silent = true }
+          
+          vim.keymap.set("n", "gD", vim.lsp.buf.declaration, opts)
+          vim.keymap.set("n", "gd", vim.lsp.buf.definition, opts)
+          vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
+          vim.keymap.set("n", "gi", vim.lsp.buf.implementation, opts)
+          vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, opts)
+          vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, opts)
+          vim.keymap.set("n", "gr", vim.lsp.buf.references, opts)
+        end
+
+        -- Setting up Mason-LSPConfig
+        mason_lspconfig.setup({
+          -- The list is empty! We don't pre-set anything.
+          ensure_installed = {}, 
+          
+          -- Enable auto-installation when opening a file
+          automatic_installation = true, 
+          
+          -- Хендлеры: как настраивать серверы
+          handlers = {
+            -- Standard handler (for 99% of languages: Python, C++, Go...)
+            function(server_name)
+              lspconfig[server_name].setup({
+                on_attach = on_attach,
+                capabilities = capabilities,
+              })
+            end,
+
+            -- Special handler for Lua (requires special settings)
+            ["lua_ls"] = function()
+               lspconfig.lua_ls.setup({
+                 on_attach = on_attach,
+                 capabilities = capabilities,
+                 settings = {
+                    Lua = {
+                        diagnostics = { globals = { "vim" } },
+                        workspace = { library = vim.api.nvim_get_runtime_file("", true) },
+                    }
+                 }
+               })
+            end,
+          }
         })
       end,
     },
 
-    -- 2. LSP Config (Setting up server connections)
-    {
-      "neovim/nvim-lspconfig",
-      config = function()
-        local lspconfig = require("lspconfig")
-        -- Adding autocompletion (cmp) capabilities to servers
-        local capabilities = require("cmp_nvim_lsp").default_capabilities()
-
-        -- A function that is triggered when an LSP is connected to a buffer
-        local on_attach = function(client, bufnr)
-          local opts = { buffer = bufnr, silent = true }
-          
-          -- Code navigation hotkeys (like in the IDE)
-          vim.keymap.set("n", "gD", vim.lsp.buf.declaration, opts) -- Go to declaration
-          vim.keymap.set("n", "gd", vim.lsp.buf.definition, opts) -- Go to definition (the most important!)
-          vim.keymap.set("n", "K", vim.lsp.buf.hover, opts) -- Documentation in a pop-up window
-          vim.keymap.set("n", "gi", vim.lsp.buf.implementation, opts) -- Show implementation
-          vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, opts) -- Rename
-          vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, opts) -- Actions (Code Action)
-          vim.keymap.set("n", "gr", vim.lsp.buf.references, opts) -- Where used (References)        
-        end
-
-        -- List of servers to launch
-        local servers = { "clangd", "gopls", "pyright", "jdtls", "lua_ls" }
-        
-        for _, server in ipairs(servers) do
-          lspconfig[server].setup({
-            on_attach = on_attach,
-            capabilities = capabilities,
-            -- Special settings for Lua
-            settings = server == "lua_ls" and {
-              Lua = {
-                diagnostics = { globals = { "vim" } }, -- To prevent vim from complaining about the global variable
-                workspace = { library = vim.api.nvim_get_runtime_file("", true) },
-              },
-            } or nil,
-          })
-        end
-      end,
-    },
-
-    -- 3.  Autocompletion(Cmp)
+    -- 2. Autocompletion(Cmp)
     {
       "hrsh7th/nvim-cmp",
       dependencies = {

@@ -131,8 +131,17 @@ require("lazy").setup({
         require('onedark').setup {
           style = 'darker'
         }
-        require('onedark').load()
       end,
+    },
+
+    -- Gruvbox theme
+    { 
+      "ellisonleao/gruvbox.nvim", 
+      priority = 1000 , 
+      config = function()
+        require("gruvbox").setup()
+        vim.cmd.colorscheme("gruvbox")
+      end  
     },
     
     -- Comments (gcc for line, gbc for block)
@@ -291,6 +300,7 @@ require("lazy").setup({
         vim.keymap.set("n", "<leader>fg", builtin.live_grep, { desc = "Find Text" }) -- Search for text (requires ripgrep)
         vim.keymap.set("n", "<leader>fb", builtin.buffers, { desc = "Find Buffers" }) -- Search for open buffers
         vim.keymap.set("n", "<leader>fh", builtin.help_tags, { desc = "Find Help" }) -- Search for help
+        vim.keymap.set("n", "<leader>th", builtin.colorscheme, { desc = "Switch Theme" }) -- Search for theme
       end,
     },
     
@@ -423,7 +433,7 @@ require("lazy").setup({
             ["<C-b>"] = cmp.mapping.scroll_docs(-4),
             ["<C-f>"] = cmp.mapping.scroll_docs(4),
             ["<C-Space>"] = cmp.mapping.complete(), -- Call the menu
-            ["<CR>"] = cmp.mapping.confirm({ select = false }), -- Press Enter to select, but only when an option is selected.
+            ["<CR>"] = cmp.mapping.confirm({ select = false }), -- Enter to select
             ["<Tab>"] = cmp.mapping(function(fallback)  -- Tab works smart
               if cmp.visible() then
                 cmp.select_next_item()
@@ -477,4 +487,7 @@ vim.keymap.set('n', '<leader>m', ':Mason<CR>', { silent = true, desc = "Open Mas
 
 -- Open Lazy
 vim.keymap.set('n', '<leader>l', ':Lazy<CR>', { silent = true, desc = "Open Lazy" })
+
+-- Copy all
+vim.keymap.set('n', '<leader>ya', ':%y+<CR>', { silent = true, desc = "Copy whole file" })
 
